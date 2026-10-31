@@ -3,14 +3,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "spotycloud"
+name = "ytscloud"
 version = "0.1.0"
 description = "A local CLI for downloading tracklists from YouTube Music and SoundCloud"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11,<3.16"
 authors = [
-    { name = "Spotycloud Contributors" }
+    { name = "Ytscloud Contributors" }
 ]
 keywords = [
     "spotify",
@@ -22,7 +22,8 @@ keywords = [
     "dj",
     "cli",
     "mp3",
-    "wav"
+    "wav",
+    "ytscloud"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -43,7 +44,8 @@ dependencies = [
 ]
 
 [project.scripts]
-spotycloud = "spotycloud:main"
+ytscloud = "ytscloud:main"
+spotycloud = "ytscloud:main"
 
 [project.urls]
 Homepage = "https://github.com/nachopalomares/music-ytscloud-downloader"
@@ -51,4 +53,4 @@ Repository = "https://github.com/nachopalomares/music-ytscloud-downloader.git"
 Issues = "https://github.com/nachopalomares/music-ytscloud-downloader/issues"
 
 [tool.setuptools]
-py-modules = ["spotycloud"]
+py-modules = ["ytscloud", "spotycloud"]

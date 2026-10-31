@@ -1,7 +1,7 @@
-# Spotycloud
+# ytscloud
 
 <p align="center">
-  <strong>Tracklists in. Clean, tagged audio files out.</strong>
+  <strong>music-ytscloud-downloader: Tracklists in. Clean, tagged audio files out.</strong>
 </p>
 
 <p align="center">
@@ -11,7 +11,7 @@
   <a href="#development"><img src="https://img.shields.io/badge/tests-88%20passed-success.svg" alt="Tests"></a>
 </p>
 
-Spotycloud is a local, lightweight command-line tool built for personal music workflows and DJ tracklist automation. Feed it a tracklist text file, search queries, or direct links from **YouTube**, **Spotify**, or **SoundCloud**, and get organized, validated **MP3** or **WAV** files saved in a single destination folder.
+**ytscloud** (published as `music-ytscloud-downloader`) is a local, lightweight command-line tool built for personal music workflows and DJ tracklist automation. Feed it a tracklist text file, search queries, or direct links from **YouTube**, **Spotify**, or **SoundCloud**, and get organized, validated **MP3** or **WAV** files saved in a single destination folder.
 
 ---
 
@@ -43,7 +43,7 @@ Spotycloud is a local, lightweight command-line tool built for personal music wo
 - **Smart Audio Matching**: Matches Spotify tracks via YouTube Music audio, with strict validation against duration mismatches, unofficial covers, live bootlegs, or incorrect edits.
 - **Graceful Fallback**: Automatically or interactively falls back from YouTube Music to SoundCloud when a reliable match is not found.
 - **Interactive Disambiguation**: In terminal mode, choose among ranked matches, jump to SoundCloud with `s`, or skip with `0`.
-- **Safe & Non-Destructive**: Embedded SQLite index (`.spotycloud.sqlite3`) remembers downloaded tracks, checksums, and source URLs. Never overwrites files and instantly skips repeats.
+- **Safe & Non-Destructive**: Embedded SQLite index (`.ytscloud.sqlite3`) remembers downloaded tracks, checksums, and source URLs. Never overwrites files and instantly skips repeats.
 - **DJ & Scripting Friendly**: Emits clean [JSON Lines](#automation--dj-integrations-json-lines) via `--json` for headless automation, scripts, and DJ library tools (such as Piloto DJ).
 - **Post-Download Audio Validation**: Every downloaded file is probed with `ffprobe` to guarantee zero corruption before moving to the final library.
 
@@ -90,7 +90,7 @@ flowchart TD
 
 ## Prerequisites
 
-Before using Spotycloud, make sure you have the following installed on your system:
+Before using ytscloud, make sure you have the following installed on your system:
 
 1. **Python**: `3.11` to `3.15`
 2. **FFmpeg & ffprobe**: Required for audio transcoding and validation.
@@ -132,10 +132,10 @@ sudo apt install -y ffmpeg python3 python3-venv python3-pip nodejs
 
 4. **Run a test download using the included example tracklist:**
    ```bash
-   spotycloud --file examples/set.txt --folder "downloads/demo-set"
+   ytscloud --file examples/set.txt --folder "downloads/demo-set"
    ```
 
-*(Alternatively, run `.venv/bin/spotycloud` directly without activating the virtual environment).*
+*(Alternatively, run `.venv/bin/ytscloud` directly without activating the virtual environment).*
 
 ---
 
@@ -145,12 +145,12 @@ sudo apt install -y ffmpeg python3 python3-venv python3-pip nodejs
 
 Search YouTube Music directly:
 ```bash
-spotycloud 'Metrika, L0rna - Lip Combo' --folder "My Set"
+ytscloud 'Metrika, L0rna - Lip Combo' --folder "My Set"
 ```
 
 Prefix with `*` to search SoundCloud directly (useful for edits, bootlegs, and DJ club mixes):
 ```bash
-spotycloud '* Dj Rankng - Puro Reggaetón (Dj Rankng Edit)' --folder "My Set"
+ytscloud '* Dj Rankng - Puro Reggaetón (Dj Rankng Edit)' --folder "My Set"
 ```
 
 > [!TIP]
@@ -169,30 +169,30 @@ Create a plain UTF-8 text file (e.g. `set.txt`) with one entry per line. Leading
 
 Run:
 ```bash
-spotycloud --file set.txt --folder "My Set"
+ytscloud --file set.txt --folder "My Set"
 ```
 
 You can also pipe tracklists via standard input using `--file -`:
 ```bash
-cat set.txt | spotycloud --file - --folder "My Set"
+cat set.txt | ytscloud --file - --folder "My Set"
 ```
 
 ### 3. Direct URLs
 
-Spotycloud natively supports direct URLs:
+ytscloud natively supports direct URLs:
 
 ```bash
 # YouTube video or Short
-spotycloud 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' --folder "My Set"
-spotycloud 'https://youtu.be/dQw4w9WgXcQ' --folder "My Set"
+ytscloud 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' --folder "My Set"
+ytscloud 'https://youtu.be/dQw4w9WgXcQ' --folder "My Set"
 
 # Spotify track or public playlist
-spotycloud 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT' --folder "My Set"
-spotycloud 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M' --folder "My Set"
+ytscloud 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT' --folder "My Set"
+ytscloud 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M' --folder "My Set"
 
 # SoundCloud track or public set/playlist
-spotycloud 'https://soundcloud.com/artist/track-name' --folder "My Set"
-spotycloud 'https://soundcloud.com/artist/sets/my-dj-set' --folder "My Set"
+ytscloud 'https://soundcloud.com/artist/track-name' --folder "My Set"
+ytscloud 'https://soundcloud.com/artist/sets/my-dj-set' --folder "My Set"
 ```
 
 ### 4. Output Folder & Format Selection
@@ -201,14 +201,14 @@ spotycloud 'https://soundcloud.com/artist/sets/my-dj-set' --folder "My Set"
 - Default output folder is `downloads/`. Pass `--folder` or `--output` to specify a custom directory:
 
 ```bash
-spotycloud --file set.txt --folder ~/Music/DJSets/Set1 --format wav
+ytscloud --file set.txt --folder ~/Music/DJSets/Set1 --format wav
 ```
 
 ---
 
 ## Interactive Version Selection
 
-When running in an interactive terminal, if YouTube Music matches are ambiguous or don't pass strict verification, Spotycloud displays a clean selection menu with up to 7 ranked choices:
+When running in an interactive terminal, if YouTube Music matches are ambiguous or don't pass strict verification, ytscloud displays a clean selection menu with up to 7 ranked choices:
 
 ```text
   Opciones encontradas:
@@ -234,7 +234,7 @@ To run completely headless without prompts, use `--yes` (or `-y`), `--json`, or 
 For integration with scripts, automated schedulers, or DJ software (such as **Piloto DJ**), use `--json`:
 
 ```bash
-spotycloud --file set.txt --folder "My Set" --json > results.jsonl
+ytscloud --file set.txt --folder "My Set" --json > results.jsonl
 ```
 
 ### Stream Event Output
@@ -265,27 +265,27 @@ A summary object is always emitted at the end:
 
 ## Folder Structure & Duplicate Prevention
 
-Spotycloud creates a clean, flat folder structure containing your audio files and a lightweight SQLite database:
+ytscloud creates a clean, flat folder structure containing your audio files and a lightweight SQLite database:
 
 ```text
 My Set/
 ├── Artist - Track 01.mp3
 ├── Artist - Track 02.mp3
 ├── Artist - Track 02 [youtube-videoId].mp3   # Collision avoided automatically
-└── .spotycloud.sqlite3                      # Local database index
+└── .ytscloud.sqlite3                        # Local database index
 ```
 
-### SQLite Index (`.spotycloud.sqlite3`)
+### SQLite Index (`.ytscloud.sqlite3`)
 - Records source platform, IDs, resolved URLs, local file paths, and SHA-256 hashes.
 - Detects previously completed downloads and skips them instantly.
 - Detects renamed or modified files without clobbering or re-downloading blindly.
-- Preserves legacy spotDL structures if upgrading from older folder formats.
+- Preserves legacy spotDL structures and `.spotycloud.sqlite3` databases seamlessly.
 
 ---
 
 ## Optional Spotify Credentials
 
-By default, Spotycloud uses anonymous metadata resolution for Spotify links. To avoid rate limits or use official Spotify Developer APIs, export your credentials:
+By default, ytscloud uses anonymous metadata resolution for Spotify links. To avoid rate limits or use official Spotify Developer APIs, export your credentials:
 
 ```bash
 export SPOTIFY_CLIENT_ID="your_spotify_client_id"
@@ -297,8 +297,8 @@ export SPOTIFY_CLIENT_SECRET="your_spotify_client_secret"
 ## Command Reference
 
 ```text
-spotycloud [-h] [--file FILE] [--folder FOLDER] [--output OUTPUT]
-           [--format {mp3,wav}] [--yes] [--json] [inputs ...]
+ytscloud [-h] [--file FILE] [--folder FOLDER] [--output OUTPUT]
+         [--format {mp3,wav}] [--yes] [--json] [inputs ...]
 ```
 
 | Argument | Type | Description |
@@ -311,14 +311,16 @@ spotycloud [-h] [--file FILE] [--folder FOLDER] [--output OUTPUT]
 | `--json` | Flag | Output structured JSON Lines and silence interactive prompts. |
 | `--help`, `-h` | Flag | Display CLI help message. |
 
+*(Note: `spotycloud` remains supported as a CLI alias).*
+
 ---
 
 ## Troubleshooting
 
 | Symptom | Cause & Solution |
 |---|---|
-| `This video is DRM protected` | Content is encrypted. Spotycloud respects access controls; select another authorized upload. |
-| `ffprobe failed` / `corrupt audio` | The source stream was incomplete or damaged during download. Spotycloud discards it and retries safely. |
+| `This video is DRM protected` | Content is encrypted. ytscloud respects access controls; select another authorized upload. |
+| `ffprobe failed` / `corrupt audio` | The source stream was incomplete or damaged during download. ytscloud discards it and retries safely. |
 | `JavaScript runtime required` | Install Deno (`brew install deno`) or Node.js (`sudo apt install nodejs`) and ensure it is on your `$PATH`. |
 | `ffmpeg or ffprobe missing` | Ensure FFmpeg is installed and accessible from your terminal. |
 | Menu does not appear | Prompts are automatically suppressed when using `--yes`, `--json`, or non-interactive pipes. Run directly in a TTY. |
@@ -343,7 +345,7 @@ Remote API calls are fully mocked, and synthetic audio samples are generated loc
 
 ## Disclaimer
 
-Spotycloud is intended strictly for personal archiving, backup, and authorized DJ workflows. Please respect artist copyrights, platform terms of service, and applicable laws in your jurisdiction. Spotycloud does not bypass DRM, decryption schemes, or private access controls.
+ytscloud is intended strictly for personal archiving, backup, and authorized DJ workflows. Please respect artist copyrights, platform terms of service, and applicable laws in your jurisdiction. ytscloud does not bypass DRM, decryption schemes, or private access controls.
 
 ---
 

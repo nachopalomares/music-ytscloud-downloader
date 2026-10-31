@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import spotycloud as app
+import ytscloud as app
 
 
 class BackendTests(unittest.TestCase):

@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import spotycloud as app
+import ytscloud as app
 
 
 SPOTIFY = "https://open.spotify.com/track/" + "A" * 22

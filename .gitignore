@@ -15,6 +15,7 @@ downloads/
 local/
 set*/
 .spotycloud-*/
+.ytscloud-*/
 *.sqlite3*
 spotify-*-mp3/
 spotify-*-wav/
