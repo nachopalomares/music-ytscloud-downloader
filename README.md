@@ -115,8 +115,8 @@ sudo apt install -y ffmpeg python3 python3-venv python3-pip nodejs
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/nachopalomares/spotycloud.git
-   cd spotycloud
+   git clone https://github.com/nachopalomares/music-ytscloud-downloader.git
+   cd music-ytscloud-downloader
    ```
 
 2. **Create and activate a virtual environment:**
