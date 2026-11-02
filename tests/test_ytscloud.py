@@ -3,6 +3,7 @@ import json
 import shutil
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from contextlib import redirect_stdout
 from dataclasses import dataclass
@@ -130,11 +131,19 @@ class MatchingTests(unittest.TestCase):
             with self.subTest(candidate=candidate, score=score), self.assertRaises(ValueError):
                 app.choose_match(self.song, {candidate: score})
 
-    def test_ambiguous_results_choose_first_valid_source(self):
+    def test_ambiguous_results_require_explicit_selection(self):
         first = Candidate()
-        self.assertEqual(app.choose_match(self.song, {first: 94, Candidate(url="other"): 96}), first.url)
-        self.assertEqual(app.choose_match(self.song, {Candidate(url="weak"): 89, first: 94,
-                                                    Candidate(url="other"): 96}), first.url)
+        for candidates in ({first: 94, Candidate(url="other"): 96},
+                           {Candidate(url="weak"): 89, first: 94, Candidate(url="other"): 96}):
+            with self.subTest(candidates=candidates), self.assertRaises(app.MatchError):
+                app.choose_match(self.song, candidates)
+
+    def test_different_named_remix_is_rejected_even_with_high_score(self):
+        song = SimpleNamespace(name="Song (Alice Remix)", duration=180)
+        with self.assertRaises(app.MatchError):
+            app.choose_match(song, {Candidate(name="Song (Bob Remix)"): 99})
+        candidate = Candidate(name="Song [Alice Remix]")
+        self.assertEqual(app.choose_match(song, {candidate: 99}), candidate.url)
 
     def test_spotify_audio_ambiguity_accepts_user_selection(self):
         first, second = Candidate(), Candidate(url="other")
@@ -155,12 +164,13 @@ class MatchingTests(unittest.TestCase):
 
 
 class ListTests(unittest.TestCase):
-    def test_user_example_routes_four_tracks_to_each_platform(self):
+    def test_example_routes_queries_and_links(self):
         sample = Path(__file__).resolve().parents[1] / "examples" / "set.txt"
         entries = [app.parse_entry(line) for line in sample.read_text().splitlines()]
-        self.assertEqual([item["platform"] for item in entries], ["youtube-music"] * 4 + ["soundcloud"] * 4)
-        self.assertEqual(entries[4]["title"], "PERDIÓ [KAYVVY EDIT]")
-        self.assertEqual(entries[5]["artists"], "LEÏTI, La Zowi")
+        self.assertEqual([item["platform"] for item in entries],
+                         ["youtube-music", "soundcloud", "soundcloud"])
+        self.assertEqual(entries[0]["title"], "Original Track")
+        self.assertEqual(entries[1]["title"], "Original Track (My Edit)")
 
     def test_link_routes_by_domain(self):
         self.assertEqual(app.parse_entry(SOUNDCLOUD), {"platform": "soundcloud", "url": SOUNDCLOUD})
@@ -185,26 +195,30 @@ class ListTests(unittest.TestCase):
         candidate = {"id": "123", "title": "Song - Radio Edit", "artists": ["Artist"]}
         self.assertEqual(app.choose_named_match("Artist", "Song - Radio Edit", [candidate]), candidate)
 
-    def test_two_valid_uploads_choose_first(self):
+    def test_two_valid_uploads_require_selection(self):
         candidates = [{"id": str(index), "title": "Song", "artists": ["Artist"]} for index in (1, 2)]
-        self.assertEqual(app.choose_named_match("Artist", "Song", candidates), candidates[0])
+        with self.assertRaises(app.MatchError):
+            app.choose_named_match("Artist", "Song", candidates)
 
-    def test_soundcloud_ambiguity_uses_search_order_instead_of_score(self):
+    def test_soundcloud_close_scores_are_ambiguous_regardless_of_order(self):
         first = {"id": "1", "title": "Song Titles", "artists": ["Artist"]}
         second = {"id": "2", "title": "Song Title", "artists": ["Artist"]}
-        self.assertEqual(app.choose_named_match("Artist", "Song Title", [first, second]), first)
+        for candidates in ([first, second], [second, first]):
+            with self.subTest(candidates=candidates), self.assertRaises(app.MatchError):
+                app.choose_named_match("Artist", "Song Title", candidates)
 
     def test_soundcloud_first_match_still_checks_artist_and_version(self):
         invalid = {"id": "1", "title": "Song (Other Edit)", "artists": ["Artist"]}
         valid = {"id": "2", "title": "Song (DJ Edit)", "artists": ["Artist"]}
         repeated = {**valid, "id": "3"}
-        self.assertEqual(app.choose_named_match("Artist", "Song (DJ Edit)", [invalid, valid, repeated]), valid)
+        self.assertEqual(app.choose_named_match("Artist", "Song (DJ Edit)", [invalid, valid]), valid)
+        with self.assertRaises(app.MatchError):
+            app.choose_named_match("Artist", "Song (DJ Edit)", [invalid, valid, repeated])
         with self.assertRaises(app.MatchError):
             app.choose_named_match("Wrong Artist", "Song (DJ Edit)", [valid])
 
-    def test_same_spotify_recording_on_multiple_albums_is_deduplicated(self):
-        candidates = [{"id": str(index), "title": "Song", "artists": ["Artist"],
-                       "recording_id": "same-isrc"} for index in (1, 2)]
+    def test_same_source_is_deduplicated(self):
+        candidates = [{"id": "1", "title": "Song", "artists": ["Artist"]}] * 2
         self.assertEqual(app.choose_named_match("Artist", "Song", candidates)["id"], "1")
 
     def test_album_context_in_requested_title(self):
@@ -394,6 +408,16 @@ class StorageTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    def test_package_exposes_only_ytscloud(self):
+        config = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        data = tomllib.loads(config.read_text(encoding="utf-8"))
+        self.assertEqual(data["project"]["scripts"], {"ytscloud": "ytscloud:main"})
+        self.assertEqual(data["tool"]["setuptools"]["py-modules"], ["ytscloud"])
+
+    def test_interrupt_returns_130_from_installed_entry_point(self):
+        with patch.object(app, "run", side_effect=KeyboardInterrupt):
+            self.assertEqual(app.main([]), 130)
+
     def setUp(self):
         terminal = patch.object(app.sys.stdin, "isatty", return_value=False)
         terminal.start()

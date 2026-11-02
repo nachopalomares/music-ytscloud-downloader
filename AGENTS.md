@@ -6,7 +6,9 @@ Crear una herramienta local para descargar canciones y playlists mediante enlace
 Permitir fuentes alternativas para canciones identificadas en Spotify; registrar la procedencia real y rechazar coincidencias ambiguas o versiones incorrectas. No prometer extracción directa ni calidad sin pérdidas. Convertir audio comprimido a WAV no mejora su calidad. Utilizar contenido propio o autorizado, sin eludir DRM ni controles de acceso.
 
 ## Estructura, estilo y comandos
-El repositorio comienza vacío, sin stack, pruebas ni herramientas configuradas. No presentar comandos o directorios propuestos como existentes. Documentar en README la instalación, ejecución y pruebas conforme se implementen.
+El proyecto usa Python 3.11–3.15, setuptools, spotDL, yt-dlp y ytmusicapi. La CLI vive en `ytscloud.py`. Las pruebas están en `tests/` y CI en `.github/workflows/ci.yml`. Documentar en README la instalación, ejecución y pruebas conforme se implementen.
+
+Ejecutar `python -m unittest discover -s tests -v` y `python -m pip check` en el entorno del proyecto. FFmpeg y ffprobe son necesarios para las pruebas de audio; las llamadas remotas se simulan.
 
 Elegir la solución mínima; reutilizar herramientas mantenidas antes de crear descargadores propios. Separar responsabilidades cuando sea necesario. Adoptar la indentación, nomenclatura y formateador del lenguaje elegido; evitar dependencias y abstracciones innecesarias.
 
@@ -25,4 +27,4 @@ Comprobar cuotas de Codex antes de nuevas tareas. Si queda menos del 30 % en cin
 ## Pruebas y contribuciones
 Definir criterios de aceptación, revisar cambios y ejecutar pruebas pertinentes. Cubrir enlaces inválidos, duplicados, fallos de red, coincidencias y audio reproducible. Usar muestras autorizadas y pruebas automatizadas independientes de servicios externos.
 
-No existe historial Git ni convención de commits. Usar mensajes breves y descriptivos. En PR y entregas, resumir cambios, comprobaciones, limitaciones y agente/modelo realmente utilizados.
+Usar mensajes de commit breves y descriptivos. En PR y entregas, resumir cambios, comprobaciones, limitaciones y agente/modelo realmente utilizados.

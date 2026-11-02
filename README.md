@@ -1,354 +1,256 @@
 # ytscloud
 
-<p align="center">
-  <strong>music-ytscloud-downloader: Tracklists in. Clean, tagged audio files out.</strong>
-</p>
+[![CI](https://github.com/nachopalomares/music-ytscloud-downloader/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nachopalomares/music-ytscloud-downloader/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-<p align="center">
-  <a href="#quick-start"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg" alt="Python Versions"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License: MIT"></a>
-  <a href="#automation"><img src="https://img.shields.io/badge/output-MP3%20%7C%20WAV-orange.svg" alt="Audio Formats"></a>
-  <a href="#development"><img src="https://img.shields.io/badge/tests-88%20passed-success.svg" alt="Tests"></a>
-</p>
+A local Python CLI for turning tracklists and supported music links into MP3 or
+WAV files. Search YouTube Music or SoundCloud, review uncertain matches in your
+terminal, and export JSON Lines for scripts.
 
-**ytscloud** (published as `music-ytscloud-downloader`) is a local, lightweight command-line tool built for personal music workflows and DJ tracklist automation. Feed it a tracklist text file, search queries, or direct links from **YouTube**, **Spotify**, or **SoundCloud**, and get organized, validated **MP3** or **WAV** files saved in a single destination folder.
+**Experimental, version 0.1.0.** Service changes, rate limits, region restrictions,
+and unavailable uploads can prevent downloads. Terminal messages are currently
+in Spanish. The repository is `music-ytscloud-downloader`; the Python package and
+primary command are `ytscloud`.
 
----
+Use only content you own or are authorized to download. Spotify provides
+metadata; audio comes from an alternative source, never directly from Spotify.
+WAV conversion does not improve the quality of compressed source audio. The
+tool does not bypass DRM or access controls.
 
-## Table of Contents
+## Install
 
-- [Key Features](#key-features)
-- [How It Works](#how-it-works)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Usage Guide](#usage-guide)
-  - [1. Single Songs & Text Queries](#1-single-songs--text-queries)
-  - [2. Tracklist Files](#2-tracklist-files)
-  - [3. Direct URLs](#3-direct-urls)
-  - [4. Output Folder & Format Selection](#4-output-folder--format-selection)
-- [Interactive Version Selection](#interactive-version-selection)
-- [Automation & DJ Integrations (JSON Lines)](#automation--dj-integrations-json-lines)
-- [Folder Structure & Duplicate Prevention](#folder-structure--duplicate-prevention)
-- [Optional Spotify Credentials](#optional-spotify-credentials)
-- [Command Reference](#command-reference)
-- [Troubleshooting](#troubleshooting)
-- [Development & Testing](#development--testing)
-- [Disclaimer](#disclaimer)
+Requirements:
 
----
+- Python 3.11–3.15.
+- FFmpeg and ffprobe on your `PATH` for conversion and audio validation.
+- A supported JavaScript runtime for YouTube downloads. Deno is recommended;
+  Node.js is also enabled by the application. Check the current requirements in
+  [yt-dlp's EJS setup guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
 
-## Key Features
+On macOS with Homebrew:
 
-- **Flexible Input**: Accepts `Artist - Title`, prefixed SoundCloud queries `* Artist - Title`, numbered tracklists, timestamps (e.g. DJ cue sheets), and direct web URLs.
-- **Smart Audio Matching**: Matches Spotify tracks via YouTube Music audio, with strict validation against duration mismatches, unofficial covers, live bootlegs, or incorrect edits.
-- **Graceful Fallback**: Automatically or interactively falls back from YouTube Music to SoundCloud when a reliable match is not found.
-- **Interactive Disambiguation**: In terminal mode, choose among ranked matches, jump to SoundCloud with `s`, or skip with `0`.
-- **Safe & Non-Destructive**: Embedded SQLite index (`.ytscloud.sqlite3`) remembers downloaded tracks, checksums, and source URLs. Never overwrites files and instantly skips repeats.
-- **DJ & Scripting Friendly**: Emits clean [JSON Lines](#automation--dj-integrations-json-lines) via `--json` for headless automation, scripts, and DJ library tools (such as Piloto DJ).
-- **Post-Download Audio Validation**: Every downloaded file is probed with `ffprobe` to guarantee zero corruption before moving to the final library.
-
----
-
-## How It Works
-
-| Input Type | Discovery Method | Audio Source |
-|---|---|---|
-| `Artist - Title` | Direct query on YouTube Music | YouTube Music (SoundCloud fallback) |
-| `* Artist - Title` | Direct search on SoundCloud | SoundCloud |
-| **YouTube Video URL** | Direct extraction of video ID | YouTube |
-| **Spotify Track or Playlist URL** | Spotify metadata lookup &rarr; YouTube Music match | YouTube Music |
-| **SoundCloud Track or Set URL** | SoundCloud API resolution | SoundCloud |
-
-```mermaid
-flowchart TD
-    Input["Input (URL, Query, or Tracklist)"] --> Check{"Input Type?"}
-    
-    Check -->|YouTube URL| DirectYT["Download YouTube Video Directly"]
-    Check -->|SoundCloud URL / * Query| SC["Search / Download SoundCloud"]
-    Check -->|Spotify URL| SpotLookup["Fetch Spotify Metadata"]
-    Check -->|Artist - Title Query| YTM["Search YouTube Music"]
-    
-    SpotLookup --> YTM
-    
-    YTM --> Found{"Reliable Match?"}
-    Found -->|Yes| DownloadYT["Download from YouTube Music"]
-    Found -->|No / Ambiguous| Manual{"Terminal Prompt?"}
-    Manual -->|User chooses option| DownloadYT
-    Manual -->|User presses 's' or auto-fallback| SC
-    
-    SC --> AudioVerify["Validate Audio Integrity (ffprobe)"]
-    DownloadYT --> AudioVerify
-    DirectYT --> AudioVerify
-    
-    AudioVerify --> Index["Register in SQLite Index & Save"]
-```
-
-> [!IMPORTANT]
-> Spotify links are used solely for metadata resolution; audio is never extracted directly from Spotify. Converting compressed web audio to WAV does not restore lost acoustic fidelity. Always ensure you have rights to download content for personal use.
-
----
-
-## Prerequisites
-
-Before using ytscloud, make sure you have the following installed on your system:
-
-1. **Python**: `3.11` to `3.15`
-2. **FFmpeg & ffprobe**: Required for audio transcoding and validation.
-3. **Deno (2.3+) or Node.js (22+)**: Required by `yt-dlp` to execute YouTube signature deciphers (EJS).
-
-### Installation of prerequisites
-
-#### macOS (Homebrew)
 ```bash
-brew install ffmpeg deno python@3.12
+brew install python ffmpeg deno
 ```
 
-#### Linux (Debian / Ubuntu)
+On Debian or Ubuntu, install the base tools, then install a supported runtime
+using the EJS guide above. Distribution packages for Node.js may be too old.
+
 ```bash
 sudo apt update
-sudo apt install -y ffmpeg python3 python3-venv python3-pip nodejs
+sudo apt install ffmpeg python3 python3-venv python3-pip git
 ```
 
----
+Install from this repository in a virtual environment:
 
-## Quick Start
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/nachopalomares/music-ytscloud-downloader.git
-   cd music-ytscloud-downloader
-   ```
-
-2. **Create and activate a virtual environment:**
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-
-3. **Install the package in editable mode:**
-   ```bash
-   pip install -e .
-   ```
-
-4. **Run a test download using the included example tracklist:**
-   ```bash
-   ytscloud --file examples/set.txt --folder "downloads/demo-set"
-   ```
-
-*(Alternatively, run `.venv/bin/ytscloud` directly without activating the virtual environment).*
-
----
-
-## Usage Guide
-
-### 1. Single Songs & Text Queries
-
-Search YouTube Music directly:
 ```bash
-ytscloud 'Metrika, L0rna - Lip Combo' --folder "My Set"
+git clone https://github.com/nachopalomares/music-ytscloud-downloader.git
+cd music-ytscloud-downloader
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install .
+ytscloud --help
 ```
 
-Prefix with `*` to search SoundCloud directly (useful for edits, bootlegs, and DJ club mixes):
+On Windows, install Python, FFmpeg, and a supported runtime, then use
+`py -m venv .venv` and `.venv\Scripts\Activate.ps1` in PowerShell before the pip
+command. Windows is not currently covered by CI.
+
+The installation above uses the repository source; it does not assume a PyPI
+release exists. To update, pull the latest changes and rerun `python -m pip install .`
+in the same environment.
+
+## Usage
+
+The following artist names and URLs are placeholders. Replace them with your
+own or authorized content before running a download.
+
 ```bash
-ytscloud '* Dj Rankng - Puro Reggaetón (Dj Rankng Edit)' --folder "My Set"
+# Search YouTube Music, with SoundCloud fallback if no reliable match is found.
+ytscloud 'Your Artist - Original Track' --folder 'My Set'
+
+# Search SoundCloud directly. Keep the asterisk inside quotes.
+ytscloud '* Your Artist - Original Track (My Edit)' --folder 'My Set'
+
+# Download a particular public SoundCloud upload.
+ytscloud 'https://soundcloud.com/your-artist/your-authorized-track' --folder 'My Set'
+
+# Choose WAV output. MP3 is the default.
+ytscloud --file set.txt --folder 'My Set' --format wav
 ```
 
-> [!TIP]
-> Always quote search queries containing special characters, asterisks (`*`), spaces, or parentheses to prevent your shell from expanding them.
+Supported input:
 
-### 2. Tracklist Files
+| Input | Behavior |
+| --- | --- |
+| `Artist - Title` | Search YouTube Music; try SoundCloud if matching fails. |
+| `* Artist - Title` | Search SoundCloud. |
+| YouTube video, `youtu.be`, or Shorts URL | Download that video without a music search. |
+| `https://open.spotify.com/track/…` | Resolve metadata and match audio on YouTube Music. |
+| `https://open.spotify.com/playlist/…` | Process public playlist tracks individually. |
+| `https://soundcloud.com/artist/track` | Download the public track. |
+| `https://soundcloud.com/artist/sets/name` | Process a public set. |
 
-Create a plain UTF-8 text file (e.g. `set.txt`) with one entry per line. Leading track numbers or cue timestamps are automatically stripped:
+Only HTTPS links on the supported domains are accepted. YouTube playlists,
+Spotify albums, shortened Spotify/SoundCloud links, private content, live streams,
+and upcoming premieres are not supported. Spotify inputs do not fall back to
+SoundCloud.
+
+### Tracklists
+
+Save a UTF-8 text file with one entry per line. Blank lines are ignored; leading
+numbers such as `01.` or `02)` are removed. Timestamps and comment lines are not
+supported. [examples/set.txt](examples/set.txt) is a template with placeholders.
 
 ```text
-01. Metrika, L0rna - Lip Combo
-02. 8belial - Mr. Fino
-03.* Bad Gyal, Ivy Queen - PERDIÓ [KAYVVY EDIT]
-04. https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT
+01. Your Artist - Original Track
+02.* Your Artist - Original Track (My Edit)
+03. https://soundcloud.com/your-artist/your-authorized-track
 ```
 
-Run:
-```bash
-ytscloud --file set.txt --folder "My Set"
-```
-
-You can also pipe tracklists via standard input using `--file -`:
-```bash
-cat set.txt | ytscloud --file - --folder "My Set"
-```
-
-### 3. Direct URLs
-
-ytscloud natively supports direct URLs:
+Edit the template before using it:
 
 ```bash
-# YouTube video or Short
-ytscloud 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' --folder "My Set"
-ytscloud 'https://youtu.be/dQw4w9WgXcQ' --folder "My Set"
-
-# Spotify track or public playlist
-ytscloud 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT' --folder "My Set"
-ytscloud 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M' --folder "My Set"
-
-# SoundCloud track or public set/playlist
-ytscloud 'https://soundcloud.com/artist/track-name' --folder "My Set"
-ytscloud 'https://soundcloud.com/artist/sets/my-dj-set' --folder "My Set"
+cp examples/set.txt set.txt
+# Replace the placeholders in set.txt with your authorized tracks.
+ytscloud --file set.txt --folder 'My Set'
+cat set.txt | ytscloud --file - --folder 'My Set' --json
 ```
 
-### 4. Output Folder & Format Selection
+### Matching and manual selection
 
-- Default format is **MP3**. Pass `--format wav` for uncompressed WAV.
-- Default output folder is `downloads/`. Pass `--folder` or `--output` to specify a custom directory:
+Automatic searches check artist, title, and recognized version labels. Spotify
+matching also checks duration and spotDL's verification and match score.
+These are metadata checks, not audio fingerprinting or proof of recording identity.
+Two uploads with identical titles and durations can still be different recordings.
 
-```bash
-ytscloud --file set.txt --folder ~/Music/DJSets/Set1 --format wav
-```
-
----
-
-## Interactive Version Selection
-
-When running in an interactive terminal, if YouTube Music matches are ambiguous or don't pass strict verification, ytscloud displays a clean selection menu with up to 7 ranked choices:
-
-```text
-  Opciones encontradas:
-    1. Artist - Track Name (Official Audio) [03:24]
-    2. Artist - Track Name (Club Edit) [04:12]
-    3. Artist - Track Name (Remix) [03:45]
-  Elige 1-3 (Enter = 1, 0 = saltar, s = buscar en SoundCloud):
-```
+In a terminal, uncertain search results can be reviewed with up to seven choices:
 
 | Key | Action |
-|:---:|---|
-| **`1` – `7`** | Download that specific candidate |
-| **`Enter`** | Accept the top-ranked match |
-| **`0`** | Skip this song and proceed to the next track |
-| **`s`** | Discard YouTube results and search SoundCloud for this track |
+| --- | --- |
+| `1`–`7` | Select the displayed candidate. |
+| Enter | Select the first displayed candidate. |
+| `0` | Skip the track. |
+| `s` | Search SoundCloud from a YouTube Music query menu. |
 
-To run completely headless without prompts, use `--yes` (or `-y`), `--json`, or piped input.
+A manual choice can accept a version that failed automatic checks; verify the
+displayed title and source. Such choices are recorded as `"selection": "manual"`.
 
----
+`--yes`, `--json`, non-interactive stdin, and `--file -` disable prompts.
+Ambiguous matches are rejected in those modes. For text searches, the tool may
+then try SoundCloud; it still requires a reliable, unambiguous match. Use an
+explicit track URL when you need a particular upload.
 
-## Automation & DJ Integrations (JSON Lines)
-
-For integration with scripts, automated schedulers, or DJ software (such as **Piloto DJ**), use `--json`:
+## Automation
 
 ```bash
-ytscloud --file set.txt --folder "My Set" --json > results.jsonl
+ytscloud --file set.txt --folder 'My Set' --json > results.jsonl
 ```
 
-### Stream Event Output
-Each processed item prints one JSON object to `stdout`:
+`stdout` contains JSON Lines; provider diagnostics go to `stderr`. Each processed
+track emits `downloaded`, `skipped`, or `error`. An illustrative success record
+(additional metadata fields are included in actual output):
 
 ```json
-{"status": "downloaded", "requested_input": "Metrika, L0rna - Lip Combo", "track_url": "https://music.youtube.com/watch?v=...", "source_url": "https://www.youtube.com/watch?v=...", "path": "/path/to/My Set/Metrika, L0rna - Lip Combo.mp3"}
-{"status": "skipped", "requested_input": "8belial - Mr. Fino", "source_url": "https://www.youtube.com/watch?v=...", "path": "/path/to/My Set/8belial - Mr. Fino.mp3"}
-{"status": "error", "requested_input": "Invalid Track", "error": "No reliable audio source found"}
+{"status":"downloaded","platform":"soundcloud","id":"123","requested_input":"Your Artist - Original Track","track_url":"https://soundcloud.com/your-artist/original-track","source_url":"https://soundcloud.com/your-artist/original-track","path":"/music/My Set/Your Artist - Original Track.mp3","format":"mp3"}
 ```
 
-A summary object is always emitted at the end:
+A completed batch ends with a summary:
 
 ```json
-{"status": "summary", "downloaded": 18, "skipped": 2, "errors": 1, "failed_tracks": ["Invalid Track"]}
+{"status":"summary","downloaded":1,"skipped":0,"errors":0,"failed_tracks":[]}
 ```
 
-### CLI Exit Codes
+Setup failures return an error record without a summary. Argument-parser errors
+use argparse's text output on `stderr`. Interrupted runs may have partial results
+and no summary. Consumers should check both the exit code and emitted records.
 
-| Exit Code | Meaning |
-|:---:|---|
-| `0` | All requested items succeeded (or were intentionally skipped) |
-| `1` | One or more items failed to download or resolve |
-| `2` | Configuration, CLI argument, or missing dependency error |
-| `130` | Execution interrupted by user (`SIGINT` / `Ctrl+C`) |
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Completed successfully, including cached downloads or intentional skips. |
+| `1` | At least one input or track failed; other items are still processed. |
+| `2` | Invalid arguments, input-file or output-directory error, or missing FFmpeg. |
+| `130` | Interrupted with Ctrl+C. |
 
----
+JSON output is available for custom integrations. **No Piloto DJ integration has
+been implemented or verified**; its contract must be confirmed separately.
 
-## Folder Structure & Duplicate Prevention
+## Files and duplicate handling
 
-ytscloud creates a clean, flat folder structure containing your audio files and a lightweight SQLite database:
+The default output directory is `downloads/`. `--folder` and `--output` are aliases.
 
 ```text
 My Set/
-├── Artist - Track 01.mp3
-├── Artist - Track 02.mp3
-├── Artist - Track 02 [youtube-videoId].mp3   # Collision avoided automatically
-└── .ytscloud.sqlite3                        # Local database index
+├── Artist - Track.mp3
+├── Artist - Track [soundcloud-456].mp3
+└── .ytscloud.sqlite3
 ```
 
-### SQLite Index (`.ytscloud.sqlite3`)
-- Records source platform, IDs, resolved URLs, local file paths, and SHA-256 hashes.
-- Detects previously completed downloads and skips them instantly.
-- Detects renamed or modified files without clobbering or re-downloading blindly.
-- Preserves legacy spotDL structures and `.spotycloud.sqlite3` databases seamlessly.
+Audio is staged in a temporary directory, checked with ffprobe, and decoded with
+FFmpeg before publication. Validation checks codec, duration, and decoding errors;
+it does not guarantee source quality or correct musical content.
 
----
+The SQLite index records source URLs, format, filename, and SHA-256. Repeating the
+same platform/track/format checks the stored checksum and skips a complete file.
+Existing filenames are preserved; collisions use a source-ID suffix or fail if
+that filename is also occupied. Missing or modified indexed files cause an error
+and are not silently replaced. Renamed files are not rediscovered automatically.
 
-## Optional Spotify Credentials
+Duplicate detection is local to an output folder and is not audio fingerprinting
+across services. YouTube lookups can reuse a previously indexed Spotify download
+of the same video. The application's old per-track folders are supported;
+arbitrary spotDL folders are not imported.
+The output filesystem must support hard links.
 
-By default, ytscloud uses anonymous metadata resolution for Spotify links. To avoid rate limits or use official Spotify Developer APIs, export your credentials:
+## Spotify credentials
+
+The default spotDL client resolves public metadata without your own credentials.
+Availability and rate limits depend on Spotify and spotDL. To use the official
+API, set both variables in your shell:
 
 ```bash
-export SPOTIFY_CLIENT_ID="your_spotify_client_id"
-export SPOTIFY_CLIENT_SECRET="your_spotify_client_secret"
+export SPOTIFY_CLIENT_ID='your-client-id'
+export SPOTIFY_CLIENT_SECRET='your-client-secret'
 ```
 
----
-
-## Command Reference
-
-```text
-ytscloud [-h] [--file FILE] [--folder FOLDER] [--output OUTPUT]
-         [--format {mp3,wav}] [--yes] [--json] [inputs ...]
-```
-
-| Argument | Type | Description |
-|---|---|---|
-| `inputs` | Positional | One or more songs or URLs to process. |
-| `--file PATH`, `-f` | Flag | Path to a tracklist file (`-` reads standard input). |
-| `--folder PATH`, `--output PATH` | Flag | Output directory for audio and database (default: `downloads/`). |
-| `--format mp3\|wav` | Flag | Target audio format (default: `mp3`). |
-| `--yes`, `-y` | Flag | Non-interactive mode; auto-accept top verified matches. |
-| `--json` | Flag | Output structured JSON Lines and silence interactive prompts. |
-| `--help`, `-h` | Flag | Display CLI help message. |
-
-*(Note: `spotycloud` remains supported as a CLI alias).*
-
----
+The app does not read `.env` files. Credentials do not grant access to Spotify
+audio or remove API restrictions. Never commit secrets, audio, or your local index.
 
 ## Troubleshooting
 
-| Symptom | Cause & Solution |
-|---|---|
-| `This video is DRM protected` | Content is encrypted. ytscloud respects access controls; select another authorized upload. |
-| `ffprobe failed` / `corrupt audio` | The source stream was incomplete or damaged during download. ytscloud discards it and retries safely. |
-| `JavaScript runtime required` | Install Deno (`brew install deno`) or Node.js (`sudo apt install nodejs`) and ensure it is on your `$PATH`. |
-| `ffmpeg or ffprobe missing` | Ensure FFmpeg is installed and accessible from your terminal. |
-| Menu does not appear | Prompts are automatically suppressed when using `--yes`, `--json`, or non-interactive pipes. Run directly in a TTY. |
+| Problem | Next step |
+| --- | --- |
+| Missing FFmpeg/ffprobe | Install FFmpeg and check both executables are on `PATH`. |
+| YouTube JavaScript errors | Check your runtime against the [EJS guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS), then reinstall with `python -m pip install --upgrade .`. |
+| Ambiguous or missing match | Review in a terminal or supply an authorized direct URL. |
+| HTTP 403/429, unavailable upload | Check availability and rate limits; retry later. Do not bypass access controls. |
+| Existing file missing or changed | Check the named file and restore it from backup if appropriate; no overwrite is attempted. |
+| Hard-link error | Choose a local filesystem that supports hard links. |
 
----
-
-## Development & Testing
-
-The project includes a full unit and integration test suite covering input parsing, fuzzy metadata matching, legacy folder migrations, collision avoidance, and audio integrity checks:
+## Development and contributing
 
 ```bash
-# Run all unit tests
-python -m unittest discover -s tests -v
-
-# Verify packaging integrity
+python -m pip install -e .
 python -m pip check
+python -m unittest discover -s tests -v
 ```
 
-Remote API calls are fully mocked, and synthetic audio samples are generated locally via FFmpeg during testing.
+Tests mock remote services and generate synthetic MP3/WAV samples locally.
+CI builds a wheel and source distribution, installs the wheel, and runs the CLI
+and the offline tests on Python 3.11–3.15. Live service compatibility is
+not exercised by this suite.
 
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) for bug reports and pull requests,
+[SECURITY.md](SECURITY.md) for security reporting, and
+[GitHub Actions](https://github.com/nachopalomares/music-ytscloud-downloader/actions)
+for the current CI results.
 
-## Disclaimer
+## License and dependencies
 
-ytscloud is intended strictly for personal archiving, backup, and authorized DJ workflows. Please respect artist copyrights, platform terms of service, and applicable laws in your jurisdiction. ytscloud does not bypass DRM, decryption schemes, or private access controls.
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses.
+[MIT](LICENSE). Dependencies keep their own licenses:
+[spotDL](https://github.com/spotDL/spotify-downloader),
+[yt-dlp](https://github.com/yt-dlp/yt-dlp), and
+[ytmusicapi](https://github.com/sigma67/ytmusicapi).
+FFmpeg and the JavaScript runtime are installed separately. This project is not
+affiliated with Spotify, YouTube, or SoundCloud. Respect platform terms and the
+rights attached to each recording.

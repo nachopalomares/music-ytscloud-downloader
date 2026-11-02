@@ -14,7 +14,6 @@ htmlcov/
 downloads/
 local/
 set*/
-.spotycloud-*/
 .ytscloud-*/
 *.sqlite3*
 spotify-*-mp3/
@@ -26,11 +25,18 @@ soundcloud-*-wav/
 *.mp3
 *.wav
 *.m4a
+*.aac
+*.flac
+*.aiff
+*.aif
+*.ogg
 *.opus
+*.mp4
 *.webm
 *.part
 *.ytdl
 *.jsonl
 *.log
+.ruff_cache/
 /set*.txt
 /lista*.txt

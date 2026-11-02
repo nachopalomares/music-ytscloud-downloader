@@ -215,7 +215,7 @@ def choose_named_match(artists, title, candidates, select=None, source=None):
         if not versions and candidate.get("album") and expected == normalized(f'{raw_title} {candidate["album"]}'):
             actual = expected
         score = SequenceMatcher(None, expected, actual).ratio()
-        key = candidate.get("recording_id") or candidate["id"]
+        key = candidate["id"]
         if score >= .92 and (key not in matches or score > matches[key][0]):
             matches[key] = (score, candidate)
     ranked = sorted(matches.values(), key=lambda pair: pair[0], reverse=True)
@@ -225,7 +225,7 @@ def choose_named_match(artists, title, candidates, select=None, source=None):
         options = [candidate for score, candidate in matches.values()]
         if select:
             return options[select(match_labels(options), source=source)]
-        return options[0]
+        raise MatchError("Hay varias coincidencias posibles; elige una en modo interactivo o usa un enlace directo.")
     return ranked[0][1]
 
 
@@ -238,10 +238,6 @@ def search_track(entry, select=None):
             "id": item["videoId"], "title": item["title"],
             "artists": [artist["name"] for artist in item["artists"]],
             "album": (item.get("album") or {}).get("name"),
-            "recording_id": (
-                json.dumps([normalized(item["title"]), sorted(normalized(a["name"]) for a in item["artists"]),
-                            item["duration_seconds"], item.get("isExplicit")]) if item.get("duration_seconds") else None
-            ),
             "track_url": f'https://music.youtube.com/watch?v={item["videoId"]}',
             "duration": item.get("duration_seconds"),
         } for item in items if item and item.get("resultType") == "song"
@@ -296,6 +292,7 @@ def choose_match(song, candidates, select=None):
     for result, score in candidates.items():
         actual = set(re.findall(r"\w+", result.name.casefold())) & versions
         if (result.verified and actual == expected and song.duration > 0
+                and (not expected or normalized(result.name) == normalized(song.name))
                 and abs(result.duration - song.duration) <= max(3, song.duration * .02)):
             previous = eligible.get(result.url)
             if previous is None or score > previous[1]:
@@ -309,7 +306,7 @@ def choose_match(song, candidates, select=None):
             labels = [f'{c.author} - {c.name} | {c.album or "Sin álbum"} | {c.duration} s\n'
                       f'       {c.url}' for c in options]
             return options[select(labels)].url
-        return options[0].url
+        raise MatchError("Hay varias fuentes posibles; elige una en modo interactivo o usa un enlace directo.")
     return ranked[0][0].url
 
 
@@ -425,8 +422,6 @@ def save_track(platform, track, requested_input, output, fmt, select=None):
         raise ValueError("Identificador de pista inválido.")
     key = f"{platform}-{track_id}-{fmt}"
     db_path = output / ".ytscloud.sqlite3"
-    if not db_path.exists() and (output / ".spotycloud.sqlite3").exists():
-        db_path = output / ".spotycloud.sqlite3"
     with closing(sqlite3.connect(db_path)) as db:
         db.execute("CREATE TABLE IF NOT EXISTS downloads (key TEXT PRIMARY KEY, record TEXT NOT NULL)")
         existing = cached_track(db, key, requested_input, output)
@@ -522,7 +517,7 @@ def emit(record, json_output=False):
         print(f'  {label}: {record.get("path", "")}', flush=True)
 
 
-def main(argv=None):
+def run(argv=None):
     parser = argparse.ArgumentParser(description="Descarga audio de YouTube y SoundCloud; acepta enlaces de Spotify.")
     parser.add_argument("entries", nargs="*", help="Enlaces o 'Artista - Título'; * indica SoundCloud")
     parser.add_argument("--file", type=Path, help="Lista de canciones, una por línea; - lee stdin")
@@ -530,7 +525,7 @@ def main(argv=None):
                         help="Carpeta de salida (por defecto: downloads)")
     parser.add_argument("--format", choices=("mp3", "wav"), default="mp3")
     parser.add_argument("--json", action="store_true", help="Emitir JSON Lines para automatización")
-    parser.add_argument("--yes", "-y", action="store_true", help="Elegir automáticamente la primera coincidencia válida")
+    parser.add_argument("--yes", "-y", action="store_true", help="Sin preguntas; rechazar coincidencias ambiguas")
     args = parser.parse_args(argv)
     logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
     try:
@@ -624,8 +619,12 @@ def main(argv=None):
     return 1 if counts["errors"] else 0
 
 
-if __name__ == "__main__":
+def main(argv=None):
     try:
-        sys.exit(main())
+        return run(argv)
     except KeyboardInterrupt:
-        sys.exit(130)
+        return 130
+
+
+if __name__ == "__main__":
+    sys.exit(main())

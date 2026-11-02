@@ -237,16 +237,15 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(track["fallback_from"], "youtube-music")
         extract.assert_called_once_with("scsearch20:artist song", download=False)
 
-    def test_soundcloud_ambiguous_search_chooses_first_valid_result(self):
+    def test_soundcloud_ambiguous_search_requires_selection(self):
         with patch.object(self.ydl, "extract_info", return_value={"entries": [
             {"id": "1", "title": "Artist - Song Titles", "uploader": "Artist",
              "webpage_url": "https://soundcloud.com/artist/first"},
             {"id": "2", "title": "Artist - Song Title", "uploader": "Artist",
              "webpage_url": "https://soundcloud.com/artist/second"},
         ]}):
-            track = app.search_track(app.parse_entry("* Artist - Song Title"))
-        self.assertEqual(track["id"], "1")
-        self.assertEqual(track["track_url"], "https://soundcloud.com/artist/first")
+            with self.assertRaises(app.MatchError):
+                app.search_track(app.parse_entry("* Artist - Song Title"))
 
     def test_soundcloud_ambiguity_allows_selection_of_second_result(self):
         with patch.object(self.ydl, "extract_info", return_value={"entries": [
@@ -258,18 +257,20 @@ class BackendTests(unittest.TestCase):
             track = app.search_track(app.parse_entry("* Artist - Song"), select=Mock(return_value=1))
         self.assertEqual(track["id"], "2")
 
-    def test_youtube_ambiguity_chooses_first_result_without_soundcloud(self):
+    def test_youtube_ambiguity_can_fall_back_to_unambiguous_soundcloud_match(self):
         item = {"resultType": "song", "title": "Song", "artists": [{"name": "Artist"}]}
         with patch.object(self.ytmusic, "search", return_value=[
             {**item, "videoId": "A" * 11, "duration_seconds": 180},
             {**item, "videoId": "B" * 11, "duration_seconds": 190},
         ]):
-            with patch.object(self.ydl, "extract_info") as soundcloud:
+            with patch.object(self.ydl, "extract_info", return_value={"entries": [{
+                "id": "123", "title": "Artist - Song", "uploader": "Artist",
+                "webpage_url": "https://soundcloud.com/artist/song",
+            }]}):
                 track = app.search_track(app.parse_entry("Artist - Song"))
-        soundcloud.assert_not_called()
-        self.assertEqual(track["id"], "A" * 11)
-        self.assertEqual(track["platform"], "youtube-music")
-        self.assertNotIn("fallback_from", track)
+        self.assertEqual(track["id"], "123")
+        self.assertEqual(track["platform"], "soundcloud")
+        self.assertEqual(track["fallback_from"], "youtube-music")
 
     def test_youtube_ambiguity_allows_selection_of_second_result(self):
         item = {"resultType": "song", "title": "Song", "artists": [{"name": "Artist"}]}
@@ -296,16 +297,16 @@ class BackendTests(unittest.TestCase):
                     app.search_track(app.parse_entry("Artist - Song"), select=Mock(side_effect=app.SelectionSkipped()))
         soundcloud.assert_not_called()
 
-    def test_youtube_reissues_do_not_become_ambiguous(self):
+    def test_identical_titles_and_durations_do_not_prove_recording_identity(self):
         item = {"resultType": "song", "title": "Song", "artists": [{"name": "Artist"}],
                 "duration_seconds": 180, "isExplicit": False}
         with patch.object(self.ytmusic, "search", return_value=[
             {**item, "videoId": "A" * 11, "album": {"name": "Album"}},
             {**item, "videoId": "B" * 11, "album": {"name": "Compilation"}},
         ]):
-            track = app.search_track(app.parse_entry("Artist - Song"))
-        self.assertEqual(track["platform"], "youtube-music")
-        self.assertEqual(track["id"], "A" * 11)
+            with patch.object(self.ydl, "extract_info", return_value={"entries": []}):
+                with self.assertRaises(app.MatchError):
+                    app.search_track(app.parse_entry("Artist - Song"))
 
     def test_soundcloud_search_removes_punctuation_and_tries_main_artist(self):
         item = {"id": "123", "title": "Artist, Guest - Song (DJ Edit)",
